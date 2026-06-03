@@ -1,5 +1,5 @@
 // COMPLETÁ ACÁ: Pegá tu URL de Google Apps Script entre las comillas (la que termina en /exec)
-const URL_API = "https://script.google.com/macros/s/AKfycbxlUNRrMi6Gx4k6Inksg7xJ8U3PGKiWB3L5ddeTZXiCAo07m6U-0DexepyzF8e6B6pL0w/exec"; 
+const URL_API = "https://script.google.com/macros/s/AKfycbxmnxJm_uwH86_LcsXim921N065z73AwWaX161xT9Um-QmeSExmY18unQrISRPdeu1stQ/exec"; 
 
 let datosLotes = []; // Array global para guardar los lotes del croquis
 
