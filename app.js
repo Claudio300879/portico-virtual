@@ -13,26 +13,26 @@ async function cargarDatos() {
         // 1. PROCESAR CONFIGURACIÓN
         if (datos.configuracion && datos.configuracion.length > 0) {
             datos.configuracion.forEach(item => {
-                const clave = item.Clave ? item.Clave.toLowerCase().trim() : "";
+                let clave = item.Clave ? item.Clave.toLowerCase().trim() : "";
                 const valor = item.Valor ? item.Valor.trim() : "";
 
-                if (clave === "nombre_barrio" || clave === "nombre") {
+                if (clave.includes("nombre") || clave.includes("barrio")) {
                     const el = document.getElementById('nombre-barrio');
                     if (el) el.innerText = valor;
                 }
-                if (clave === "telefono_guardia" || clave === "telefono") {
+                if (clave.includes("telefono") || clave.includes("guardia")) {
                     const el = document.getElementById('btn-llamar');
                     if (el && valor) el.href = `tel:${valor.replace(/\s+/g, '')}`;
                 }
-                if (clave === "link_reglamento" || clave === "reglamento") {
+                if (clave === "reglamento") { 
                     const el = document.getElementById('btn-reglamento');
                     if (el && valor) el.href = valor;
                 }
-                if (clave === "horario_ingreso" || clave === "horario") {
+                if (clave.includes("horario")) { 
                     const el = document.getElementById('horario-ingreso');
                     if (el) el.innerHTML = `<strong>Horario de ingreso:</strong> ${valor}`;
                 }
-                if (clave === "aviso_importante" || clave === "aviso") {
+                if (clave.includes("aviso") || clave.includes("importante")) {
                     const elAlerta = document.getElementById('alerta-aviso');
                     const elTexto = document.getElementById('texto-aviso');
                     if (elAlerta && elTexto && valor) {
@@ -43,18 +43,18 @@ async function cargarDatos() {
             });
         }
 
-        // 2. PROCESAR Y GUARDAR LOTES EN LA VARIABLE GLOBAL
-        if (datos.lotes) {
+        // 2. PROCESAR Y GUARDAR LOTES
+        if (datos.lotes && datos.lotes.length > 0) {
             datosLotes = datos.lotes;
+            console.log("Lotes cargados exitosamente:", datosLotes.length);
         }
 
     } catch (error) {
         console.error("Error al conectar con Google Sheets:", error);
-        // Salvavidas por si falla la conexión
         const elBarrio = document.getElementById('nombre-barrio');
         if (elBarrio) elBarrio.innerText = "Urbanización Potreros de Quijano";
         const elHorario = document.getElementById('horario-ingreso');
-        if (elHorario) elHorario.innerHTML = "<strong>Horario de ingreso:</strong> No disponible por el momento.";
+        if (elHorario) elHorario.innerHTML = "<strong>Horario de ingreso:</strong> No disponible.";
     }
 }
 
@@ -72,10 +72,11 @@ function renderizarLotes(lista) {
         const div = document.createElement('div');
         div.className = 'tarjeta-lote';
         
-        const mza = lote.Manzana || '';
-        const calle = lote.Calle || '';
-        const est = lote.Estado || 'Disponible';
-        const rutaUrl = lote.Ruta || '';
+        // Tolerancia a mayúsculas/minúsculas de las propiedades del Sheets
+        const mza = lote.Manzana || lote.manzana || '';
+        const calle = lote.Calle || lote.calle || '';
+        const est = lote.Estado || lote.estado || 'Disponible';
+        const rutaUrl = lote.Ruta || lote.ruta || '';
         
         div.innerHTML = `
             <div style="text-align: left;">
@@ -101,35 +102,41 @@ function ejecutarBusqueda() {
         return;
     }
 
+    // Filtramos soportando propiedades tanto en mayúsculas como en minúsculas
     const filtrados = datosLotes.filter(lote => {
-        const calleLote = (lote.Calle || '').toLowerCase();
-        const mzaLote = (lote.Manzana || '').toLowerCase();
+        const calleLote = (lote.Calle || lote.calle || '').toLowerCase();
+        const mzaLote = (lote.Manzana || lote.manzana || '').toLowerCase();
         return calleLote.includes(termino) || mzaLote.includes(termino);
     });
     
     renderizarLotes(filtrados);
 
-    // Si da Enter con un solo resultado válido, abre su mapa
-    if (filtrados.length === 1 && filtrados[0].Ruta && filtrados[0].Ruta !== "https://maps.google.com/") {
-        window.open(filtrados[0].Ruta, '_blank');
+    // Si hay un único resultado y presionan Enter, abre la ruta de Google Maps
+    if (filtrados.length === 1) {
+        const r = filtrados[0].Ruta || filtrados[0].ruta;
+        if (r && r !== "https://maps.google.com/") {
+            window.open(r, '_blank');
+        }
     }
 }
 
-// Escuchadores al cargar la página
+// Inicialización de escuchadores globales
 document.addEventListener('DOMContentLoaded', () => {
-    // Disparar la carga inicial de datos desde Google
     cargarDatos();
 
     const input = document.getElementById('search-input');
     const botonLupa = document.getElementById('search-button');
 
+    // Escucha en tiempo real mientras se escribe
     input?.addEventListener('input', ejecutarBusqueda);
     
+    // Escucha la tecla Enter
     input?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             ejecutarBusqueda();
         }
     });
 
+    // Escucha el clic en el botón de la lupa
     botonLupa?.addEventListener('click', ejecutarBusqueda);
 });
