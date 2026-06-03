@@ -1,5 +1,5 @@
 // Conexión directa con tu API de Google Sheets
-const API_URL = "https://script.google.com/macros/s/AKfycbxakF-OVT8cu5w5fIS_bidraVzLt1utF85nzEyghkIQ4P0c8IXCLgpqAsjyyMm0b7oGkw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxakF-OVT8cu5w5FIS_bidraVzLt1utf85nzEyghkIQ4P0c8IXCLgpqAsjyyMm0b7oGkw/exec";
 
 let datosLotes = []; // Matriz donde guardaremos las manzanas para el buscador
 
@@ -8,71 +8,99 @@ async function cargarDatos() {
     try {
         const respuesta = await fetch(API_URL);
         const data = await respuesta.json();
-        
-        // 1. Inyectar datos de la pestaña 'Configuracion' en el HTML
-        document.getElementById('barrio-nombre').innerText = data.configuracion.nombre_barrio;
-        document.getElementById('info-horario').innerText = data.configuracion.horario_ingreso_obras;
-        document.getElementById('link-guardia').href = `tel:${data.configuracion.telefono_guardia}`;
-        document.getElementById('link-reglamento').href = data.configuracion.reglamento_pdf;
-        
-        // Mostrar alerta importante si el administrador escribió algo
-        if (data.configuracion.aviso_importante) {
-            const alerta = document.getElementById('aviso-alerta');
-            alerta.innerText = data.configuracion.aviso_importante;
-            alerta.style.display = 'block';
+
+        // Convertimos tu lista vertical (Clave y Valor) en un objeto fácil de leer
+        const config = {};
+        if (data.configuracion && Array.isArray(data.configuracion)) {
+            data.configuracion.forEach(item => {
+                if (item.Clave) {
+                    config[item.Clave.trim()] = item.Valor;
+                }
+            });
         }
-        
-        // 2. Guardar el array de lotes para el buscador dinámico
-        datosLotes = data.lotes;
-        
+
+        // 1. Inyectar datos de la configuración vertical en el HTML
+        const barrioNombre = document.getElementById('barrio-nombre');
+        if (barrioNombre) {
+            barrioNombre.innerText = config['nombre_barrio'] || 'Urbanización Ruta 36';
+        }
+
+        const infoHorario = document.getElementById('info-horario');
+        if (infoHorario) {
+            infoHorario.innerText = config['horario_ingreso_obras'] || '';
+        }
+
+        const linkGuardia = document.getElementById('link-guardia');
+        if (linkGuardia && config['telefono_guardia']) {
+            linkGuardia.href = `tel:${config['telefono_guardia'].replace(/\s+/g, '')}`;
+        }
+
+        const linkReglamento = document.getElementById('link-reglamento');
+        if (linkReglamento) {
+            linkReglamento.href = config['Reglamento'] || '#';
+        }
+
+        // 2. Mostrar alerta importante (ej: restricción de camiones por lluvia)
+        const alerta = document.getElementById('alerta-importante');
+        if (alerta) {
+            const textoAviso = config['aviso_importante'] || config['aviso_important'] || '';
+            if (textoAviso) {
+                alerta.innerText = textoAviso;
+                alerta.style.display = 'block'; // Muestra el cartel si hay texto
+            } else {
+                alerta.style.display = 'none'; // Lo oculta si está vacío
+            }
+        }
+
+        // 3. Guardar la lista de lotes para el buscador dinámico
+        if (data.lotes) {
+            datosLotes = data.lotes;
+            renderizarLotes(datosLotes);
+        }
+
     } catch (error) {
-        console.error("Error al conectar con la API de Google Sheets:", error);
-        document.getElementById('barrio-nombre').innerText = "Error al cargar datos del servidor";
+        console.error("Error al conectar con la API:", error);
+        const banner = document.getElementById('status-banner');
+        if (banner) {
+            banner.innerText = "Error al cargar datos del servidor";
+            banner.style.display = 'block';
+        }
     }
 }
 
-// Lógica de filtrado en tiempo real para el buscador
-document.getElementById('buscador').addEventListener('input', function(e) {
-    const busqueda = e.target.value.trim().toLowerCase();
-    const tarjetaResultado = document.getElementById('resultado');
+// Función para mostrar los lotes en pantalla al buscar
+function renderizarLotes(lista) {
+    const contenedor = document.getElementById('resultados-lotes');
+    if (!contenedor) return;
     
-    // Si el buscador está vacío, escondemos la tarjeta de información
-    if (busqueda === "") {
-        tarjetaResultado.style.display = 'none';
+    contenedor.innerHTML = '';
+    
+    if (lista.length === 0) {
+        contenedor.innerHTML = '<p class="no-results">No se encontraron manzanas o calles con ese nombre.</p>';
         return;
     }
-    
-    // Filtramos el JSON buscando coincidencias exactas o parciales por Manzana o Calle
-    const encontrado = datosLotes.find(item => 
-        item.Manzana.toString().toLowerCase() === busqueda || 
-        item.Manzana.toString().toLowerCase().includes(busqueda) ||
-        item.Calle_Principal.toLowerCase().includes(busqueda)
-    );
-    
-    // Si encontramos la manzana/calle, renderizamos los datos en caliente
-    if (encontrado) {
-        document.getElementById('res-mza').innerText = `Manzana ${encontrado.Manzana}`;
-        document.getElementById('res-calle').innerText = encontrado.Calle_Principal;
-        document.getElementById('res-ref').innerText = encontrado.Ubicacion_Referencia;
-        
-        const divEstado = document.getElementById('res-estado');
-        divEstado.innerText = encontrado.Estado;
-        
-        // Cambiamos el estilo visual de la etiqueta según el estado de la obra
-        divEstado.className = 'status'; 
-        if (encontrado.Estado.toLowerCase() === 'en obra') {
-            divEstado.classList.add('status-obra');
-        } else if (encontrado.Estado.toLowerCase() === 'consolidado') {
-            divEstado.classList.add('status-listo');
-        } else {
-            divEstado.classList.add('status-vacio');
-        }
-        
-        tarjetaResultado.style.display = 'block'; // Mostramos el bloque con los datos
-    } else {
-        tarjetaResultado.style.display = 'none'; // Si no hay coincidencias, se oculta
-    }
+
+    lista.forEach(lote => {
+        const div = document.createElement('div');
+        div.className = 'tarjeta-lote';
+        div.innerHTML = `
+            <h4>${lote.Manzana || lote.manzana || ''} - ${lote.Calle || lote.calle || ''}</h4>
+            <p><strong>Estado:</strong> ${lote.Estado || lote.estado || 'Disponible'}</p>
+        `;
+        contenedor.appendChild(div);
+    });
+}
+
+// Escuchar lo que escribe el usuario en la barra de búsqueda
+document.getElementById('search-input')?.addEventListener('input', (e) => {
+    const termino = e.target.value.toLowerCase().trim();
+    const filtrados = datosLotes.filter(lote => {
+        const calle = (lote.Calle || lote.calle || '').toLowerCase();
+        const manzana = (lote.Manzana || lote.manzana || '').toLowerCase();
+        return calle.includes(termino) || manzana.includes(termino);
+    });
+    renderizarLotes(filtrados);
 });
 
-// Inicializar la carga cuando el DOM esté completamente listo
-window.addEventListener('DOMContentLoaded', cargarDatos);
+// Iniciar la carga al abrir la página
+document.addEventListener('DOMContentLoaded', cargarDatos);
