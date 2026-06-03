@@ -1,87 +1,11 @@
-// Conexión directa con tu API de Google Sheets
-const API_URL = "https://script.google.com/macros/s/AKfycbyYMbGl-Ia3sWz52wblMt-yrq5xsitScRlNZETcQ1R4ZOEExuRAU4x5lh81kJ1zoXSEQg/exec";
-
-let datosLotes = []; 
-
-async function cargarDatos() {
-    try {
-        const respuesta = await fetch(API_URL);
-        const data = await respuesta.json();
-
-        const config = {};
-        
-        // Buscamos la sección de configuración de forma flexible
-        const configData = data.configuracion || data.Configuracion || data.config || [];
-        
-        if (Array.isArray(configData)) {
-            configData.forEach(item => {
-                // Buscamos la columna de la izquierda (Clave / clave) y la de la derecha (Valor / valor)
-                const claveOriginal = item.Clave || item.clave || item.CLAVE || '';
-                const valorOriginal = item.Valor || item.valor || item.VALOR || '';
-                
-                if (claveOriginal) {
-                    // Limpiamos espacios y pasamos a minúsculas para que combine siempre
-                    const claveLimpia = claveOriginal.toString().trim().toLowerCase();
-                    config[claveLimpia] = valorOriginal;
-                }
-            });
-        }
-
-        // 1. Inyectar datos dinámicos en el HTML (usando nombres en minúsculas)
-        const barrioNombre = document.getElementById('barrio-nombre');
-        if (barrioNombre) {
-            barrioNombre.innerText = config['nombre_barrio'] || 'Urbanización Ruta 36';
-        }
-
-        const infoHorario = document.getElementById('info-horario');
-        if (infoHorario) {
-            infoHorario.innerText = config['horario_ingreso_obras'] || '';
-        }
-
-        const linkGuardia = document.getElementById('link-guardia');
-        if (linkGuardia && config['telefono_guardia']) {
-            linkGuardia.href = `tel:${config['telefono_guardia'].toString().replace(/\s+/g, '')}`;
-        }
-
-        const linkReglamento = document.getElementById('link-reglamento');
-        if (linkReglamento) {
-            linkReglamento.href = config['reglamento'] || '#';
-        }
-
-        // 2. Mostrar alerta importante
-        const alerta = document.getElementById('alerta-importante');
-        if (alerta) {
-            const textoAviso = config['aviso_importante'] || config['aviso_important'] || '';
-            if (textoAviso) {
-                alerta.innerText = textoAviso;
-                alerta.style.display = 'block';
-            } else {
-                alerta.style.display = 'none';
-            }
-        }
-
-        // 3. Guardar la lista de lotes para el buscador
-        const listaLotes = data.lotes || data.Lotes || [];
-        if (listaLotes) {
-            datosLotes = listaLotes;
-            renderizarLotes(datosLotes);
-        }
-
-    } catch (error) {
-        console.error("Error al conectar con la API:", error);
-        const barrioNombre = document.getElementById('barrio-nombre');
-        if (barrioNombre) barrioNombre.innerText = "Error de conexión";
-    }
-}
-
 function renderizarLotes(lista) {
     const contenedor = document.getElementById('resultados-lotes');
     if (!contenedor) return;
     
     contenedor.innerHTML = '';
     
-    if (lista.length === 0) {
-        contenedor.innerHTML = '<p class="no-results">No se encontraron manzanas o calles.</p>';
+    // Si no hay nada escrito o la lista está vacía, no mostramos nada
+    if (!lista || lista.length === 0) {
         return;
     }
 
@@ -89,26 +13,63 @@ function renderizarLotes(lista) {
         const div = document.createElement('div');
         div.className = 'tarjeta-lote';
         
-        const mza = lote.Manzana || lote.manzana || lote.Mza || lote.mza || '';
-        const calle = lote.Calle || lote.calle || '';
-        const est = lote.Estado || lote.estado || 'Disponible';
+        const mza = lote.Manzana || '';
+        const calle = lote.Calle || '';
+        const est = lote.Estado || 'Disponible';
+        const rutaUrl = lote.Ruta || '';
         
         div.innerHTML = `
-            <h4>${mza} - ${calle}</h4>
-            <p><strong>Estado:</strong> ${est}</p>
+            <div style="text-align: left;">
+                <h4 style="margin:0 0 5px 0; color: #1a365d;">${mza}</h4>
+                <p style="margin:0; font-size:14px; color: #4a5568;"><strong>Ubicación:</strong> ${calle}</p>
+                <p style="margin:0; font-size:14px; color: #4a5568;"><strong>Estado:</strong> ${est}</p>
+            </div>
+            ${rutaUrl ? `<a href="${rutaUrl}" target="_blank" class="btn-ruta" style="background-color: #007bff; color: white; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; margin-top: 5px;">🗺️ Ver Ruta</a>` : ''}
         `;
         contenedor.appendChild(div);
     });
 }
 
-document.getElementById('search-input')?.addEventListener('input', (e) => {
-    const termino = e.target.value.toLowerCase().trim();
-    const filtrados = datosLotes.filter(lote => {
-        const calle = (lote.Calle || lote.calle || '').toLowerCase();
-        const manzana = (lote.Manzana || lote.manzana || lote.Mza || lote.mza || '').toLowerCase();
-        return calle.includes(termino) || manzana.includes(termino);
-    });
-    renderizarLotes(filtrados);
-});
+function ejecutarBusqueda() {
+    const input = document.getElementById('search-input');
+    const termino = input ? input.value.toLowerCase().trim() : '';
+    
+    // Si borró el texto, limpiamos la pantalla
+    if (termino === '') {
+        renderizarLotes([]);
+        return;
+    }
 
-document.addEventListener('DOMContentLoaded', cargarDatos);
+    // Filtramos sobre el array global de datos que viene de Google Sheets
+    const filtrados = datosLotes.filter(lote => {
+        const calleLote = (lote.Calle || '').toLowerCase();
+        const mzaLote = (lote.Manzana || '').toLowerCase();
+        return calleLote.includes(termino) || mzaLote.includes(termino);
+    });
+    
+    renderizarLotes(filtrados);
+
+    // Si le dio a Enter y hay una coincidencia exacta única, abre la ruta directo
+    if (filtrados.length === 1 && filtrados[0].Ruta) {
+        window.open(filtrados[0].Ruta, '_blank');
+    }
+}
+
+// Escuchadores globales
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('search-input');
+    const botonLupa = document.getElementById('search-button');
+
+    // Busca automáticamente mientras escribe
+    input?.addEventListener('input', ejecutarBusqueda);
+    
+    // Busca al presionar Enter
+    input?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            ejecutarBusqueda();
+        }
+    });
+
+    // Busca al hacer clic en la lupa
+    botonLupa?.addEventListener('click', ejecutarBusqueda);
+});
