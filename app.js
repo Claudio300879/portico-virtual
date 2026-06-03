@@ -1,25 +1,33 @@
 // Conexión directa con tu API de Google Sheets
 const API_URL = "https://script.google.com/macros/s/AKfycbxakF-OVT8cu5w5FIS_bidraVzLt1utf85nzEyghkIQ4P0c8IXCLgpqAsjyyMm0b7oGkw/exec";
 
-let datosLotes = []; // Matriz donde guardaremos las manzanas para el buscador
+let datosLotes = []; 
 
-// Función principal para traer los datos mediante FETCH y JSON
 async function cargarDatos() {
     try {
         const respuesta = await fetch(API_URL);
         const data = await respuesta.json();
 
-        // Convertimos tu lista vertical (Clave y Valor) en un objeto fácil de leer
         const config = {};
-        if (data.configuracion && Array.isArray(data.configuracion)) {
-            data.configuracion.forEach(item => {
-                if (item.Clave) {
-                    config[item.Clave.trim()] = item.Valor;
+        
+        // Buscamos la sección de configuración de forma flexible
+        const configData = data.configuracion || data.Configuracion || data.config || [];
+        
+        if (Array.isArray(configData)) {
+            configData.forEach(item => {
+                // Buscamos la columna de la izquierda (Clave / clave) y la de la derecha (Valor / valor)
+                const claveOriginal = item.Clave || item.clave || item.CLAVE || '';
+                const valorOriginal = item.Valor || item.valor || item.VALOR || '';
+                
+                if (claveOriginal) {
+                    // Limpiamos espacios y pasamos a minúsculas para que combine siempre
+                    const claveLimpia = claveOriginal.toString().trim().toLowerCase();
+                    config[claveLimpia] = valorOriginal;
                 }
             });
         }
 
-        // 1. Inyectar datos de la configuración vertical en el HTML
+        // 1. Inyectar datos dinámicos en el HTML (usando nombres en minúsculas)
         const barrioNombre = document.getElementById('barrio-nombre');
         if (barrioNombre) {
             barrioNombre.innerText = config['nombre_barrio'] || 'Urbanización Ruta 36';
@@ -32,43 +40,40 @@ async function cargarDatos() {
 
         const linkGuardia = document.getElementById('link-guardia');
         if (linkGuardia && config['telefono_guardia']) {
-            linkGuardia.href = `tel:${config['telefono_guardia'].replace(/\s+/g, '')}`;
+            linkGuardia.href = `tel:${config['telefono_guardia'].toString().replace(/\s+/g, '')}`;
         }
 
         const linkReglamento = document.getElementById('link-reglamento');
         if (linkReglamento) {
-            linkReglamento.href = config['Reglamento'] || '#';
+            linkReglamento.href = config['reglamento'] || '#';
         }
 
-        // 2. Mostrar alerta importante (ej: restricción de camiones por lluvia)
+        // 2. Mostrar alerta importante
         const alerta = document.getElementById('alerta-importante');
         if (alerta) {
             const textoAviso = config['aviso_importante'] || config['aviso_important'] || '';
             if (textoAviso) {
                 alerta.innerText = textoAviso;
-                alerta.style.display = 'block'; // Muestra el cartel si hay texto
+                alerta.style.display = 'block';
             } else {
-                alerta.style.display = 'none'; // Lo oculta si está vacío
+                alerta.style.display = 'none';
             }
         }
 
-        // 3. Guardar la lista de lotes para el buscador dinámico
-        if (data.lotes) {
-            datosLotes = data.lotes;
+        // 3. Guardar la lista de lotes para el buscador
+        const listaLotes = data.lotes || data.Lotes || [];
+        if (listaLotes) {
+            datosLotes = listaLotes;
             renderizarLotes(datosLotes);
         }
 
     } catch (error) {
         console.error("Error al conectar con la API:", error);
-        const banner = document.getElementById('status-banner');
-        if (banner) {
-            banner.innerText = "Error al cargar datos del servidor";
-            banner.style.display = 'block';
-        }
+        const barrioNombre = document.getElementById('barrio-nombre');
+        if (barrioNombre) barrioNombre.innerText = "Error de conexión";
     }
 }
 
-// Función para mostrar los lotes en pantalla al buscar
 function renderizarLotes(lista) {
     const contenedor = document.getElementById('resultados-lotes');
     if (!contenedor) return;
@@ -76,31 +81,34 @@ function renderizarLotes(lista) {
     contenedor.innerHTML = '';
     
     if (lista.length === 0) {
-        contenedor.innerHTML = '<p class="no-results">No se encontraron manzanas o calles con ese nombre.</p>';
+        contenedor.innerHTML = '<p class="no-results">No se encontraron manzanas o calles.</p>';
         return;
     }
 
     lista.forEach(lote => {
         const div = document.createElement('div');
         div.className = 'tarjeta-lote';
+        
+        const mza = lote.Manzana || lote.manzana || lote.Mza || lote.mza || '';
+        const calle = lote.Calle || lote.calle || '';
+        const est = lote.Estado || lote.estado || 'Disponible';
+        
         div.innerHTML = `
-            <h4>${lote.Manzana || lote.manzana || ''} - ${lote.Calle || lote.calle || ''}</h4>
-            <p><strong>Estado:</strong> ${lote.Estado || lote.estado || 'Disponible'}</p>
+            <h4>${mza} - ${calle}</h4>
+            <p><strong>Estado:</strong> ${est}</p>
         `;
         contenedor.appendChild(div);
     });
 }
 
-// Escuchar lo que escribe el usuario en la barra de búsqueda
 document.getElementById('search-input')?.addEventListener('input', (e) => {
     const termino = e.target.value.toLowerCase().trim();
     const filtrados = datosLotes.filter(lote => {
         const calle = (lote.Calle || lote.calle || '').toLowerCase();
-        const manzana = (lote.Manzana || lote.manzana || '').toLowerCase();
+        const manzana = (lote.Manzana || lote.manzana || lote.Mza || lote.mza || '').toLowerCase();
         return calle.includes(termino) || manzana.includes(termino);
     });
     renderizarLotes(filtrados);
 });
 
-// Iniciar la carga al abrir la página
 document.addEventListener('DOMContentLoaded', cargarDatos);
