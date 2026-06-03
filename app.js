@@ -1,5 +1,5 @@
 // Conexión directa con tu API de Google Sheets
-const API_URL = "https://script.google.com/macros/s/AKfycbxi-xZv-PnSC3qIsLtSwNcCLSKSWL5niWHpOj6QAb63dY1Yv-XSj1QbaLMLGTZCWU1kHw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwTU28_44gMXaD8HDSucI0zbjw7RCqsjivGOfLx1iFgzQXR1lTnfp70TyyStX1LyI6Tug/exec";
 
 let datosLotes = []; 
 
