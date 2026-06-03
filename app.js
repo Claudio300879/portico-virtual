@@ -1,5 +1,5 @@
 // Conexión directa con tu API de Google Sheets
-const API_URL = "PEGAR_ACA_TU_URL_DE_APPS_SCRIPT";
+const API_URL = "https://script.google.com/macros/s/AKfycbxakF-OVT8cu5w5fIS_bidraVzLt1utF85nzEyghkIQ4P0c8IXCLgpqAsjyyMm0b7oGkw/exec";
 
 let datosLotes = []; // Matriz donde guardaremos las manzanas para el buscador
 
